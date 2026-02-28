@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "triage-api:install": "npm --prefix services/triage-api install",
+    "triage-api:dev": "npm --prefix services/triage-api run dev",
+    "triage-api:build": "npm --prefix services/triage-api run build",
+    "triage-api:start": "npm --prefix services/triage-api run start"
   },
   "dependencies": {
     "@ai-sdk/react": "^3.0.107",

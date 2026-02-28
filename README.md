@@ -1,36 +1,138 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ClawTriage (ElevenLabs) MVP
 
-## Getting Started
+ClawTriage turns Telegram bug reports into GitHub issues:
 
-First, run the development server:
+1. User sends `/triage owner/repo` (or `/triage owner/repo: typed text`).
+2. User sends a voice note.
+3. OpenClaw transcribes audio via ElevenLabs Scribe v2.
+4. `clawtriage` skill formats a structured issue.
+5. Local `triage-api` creates the GitHub issue via Composio.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Skill Placement
+
+Copy this skill folder to:
+
+`~/.openclaw/workspace/skills/clawtriage`
+
+Source in this repo:
+
+`skills/clawtriage/SKILL.md`
+
+## OpenClaw Audio Transcription Config
+
+Use this `openclaw.json` snippet (replace `/ABS/PATH/...`):
+
+```json
+{
+  "tools": {
+    "media": {
+      "audio": {
+        "enabled": true,
+        "models": [
+          {
+            "type": "cli",
+            "command": "node",
+            "args": ["/ABS/PATH/scripts/eleven_stt.mjs", "{{MediaPath}}"],
+            "timeoutSeconds": 45
+          }
+        ]
+      }
+    }
+  }
+}
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+OpenClaw behavior note:
 
-You can start editing the page by modifying `src/app/page.tsx`. The page auto-updates as you edit the file.
+- On successful transcription, OpenClaw sets `{{Transcript}}`.
+- OpenClaw also maps transcript text into `CommandBody` and `RawBody`, so slash-command flows still work with voice notes.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Optional Snippets
 
-## Learn More
+TTS:
 
-To learn more about Next.js, take a look at the following resources:
+```json
+{
+  "messages": {
+    "tts": {
+      "auto": "inbound",
+      "provider": "elevenlabs"
+    }
+  }
+}
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+OpenRouter model:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```json
+{
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "openrouter/openai/gpt-4o-mini"
+      }
+    }
+  }
+}
+```
 
-## Deploy on Vercel
+## Triage API Setup
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+`services/triage-api` is a standalone Node/TypeScript service.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Install dependencies:
+
+```bash
+npm run triage-api:install
+```
+
+2. Create environment file:
+
+```bash
+cp services/triage-api/.env.example services/triage-api/.env
+```
+
+3. Set required env:
+
+- `COMPOSIO_API_KEY` (required)
+- `COMPOSIO_GITHUB_AUTH_CONFIG_ID` (optional; if omitted, service auto-authorizes via toolkit)
+- `TRIAGE_CALLBACK_URL` (optional)
+
+4. Run service:
+
+```bash
+npm run triage-api:dev
+```
+
+Default base URL is `http://127.0.0.1:8787`.
+
+### API Contracts
+
+- `POST /github/create-issue`
+  - input: `{ "repo":"owner/repo", "title":"...", "body":"...", "labels":["bug"] }`
+  - success: `{ "ok": true, "issueUrl": "https://github.com/..." }`
+  - auth-needed: `{ "ok": false, "needsAuth": true, "authUrl": "..." }`
+- `POST /auth/github`
+  - output: `{ "ok": true, "authUrl": "..." }`
+
+## ElevenLabs Environment
+
+Set `ELEVENLABS_API_KEY` in the OpenClaw gateway/runtime environment that executes the audio CLI model.
+
+The CLI entrypoint is:
+
+```bash
+node scripts/eleven_stt.mjs <local-audio-path>
+```
+
+It prints only transcript text to stdout and exits non-zero on failure.
+
+## 30-Second Demo Script
+
+1. Start `triage-api`.
+2. In Telegram, send: `/triage owner/repo`
+3. Send a voice note describing a bug.
+4. OpenClaw transcribes with ElevenLabs and generates structured issue content.
+5. Skill calls `triage-api`.
+6. If GitHub auth is needed, connect once using returned auth URL.
+7. Retry `/triage` and receive a GitHub issue link.

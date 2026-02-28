@@ -33,6 +33,13 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 .env.local
+!.env.example
+!services/triage-api/.env.example
+services/triage-api/.env
+
+# triage-api build artifacts
+services/triage-api/dist/
+services/triage-api/node_modules/
 
 # vercel
 .vercel

@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Local service artifacts:
+    "services/triage-api/dist/**",
+    "services/triage-api/node_modules/**",
   ]),
 ]);
 
