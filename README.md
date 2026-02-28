@@ -1,4 +1,4 @@
-# ClawTriage (ElevenLabs) MVP
+# ClawTriage 
 
 ClawTriage turns Telegram bug reports into GitHub issues:
 
